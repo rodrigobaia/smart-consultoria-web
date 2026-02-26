@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POC — Importação</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="./images/favicon_io/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./images/favicon_io/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./images/favicon_io/favicon-16x16.png">
+  <link rel="shortcut icon" href="./images/favicon_io/favicon.ico">
+  <link rel="manifest" href="./images/favicon_io/site.webmanifest">
+  <meta name="theme-color" content="#512bd4">
+  <link rel="stylesheet" href="./css/styles.css" />
+
+  <!-- SheetJS para leitura de arquivos Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <div id="content" style="display:none">
+    <section class="view">
+      <div class="card">
+        <div class="row row--between row--wrap">
+          <div>
+            <h1>Importação (POC)</h1>
+            <p class="muted">
+              Cruzamento por <strong>Código da Proposta</strong>. Colunas e fórmulas detalhadas serão definidas mais à
+              frente.
+            </p>
+          </div>
+          <div class="pill">
+            <span class="pill__label">Encoding</span>
+            <select id="importEncoding" class="pill__select" title="Encoding de leitura do arquivo">
+              <option value="utf-8">UTF-8</option>
+              <option value="windows-1252">Windows-1252</option>
+              <option value="iso-8859-1">ISO-8859-1</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom: 1rem;">
+          <h2 style="margin:0 0 8px 0; font-size:1rem;">Competência (mês/ano) do lote</h2>
+          <p class="muted" style="margin:0 0 10px 0;">Obrigatório. Define o lote de importação; reimportar para a mesma competência substitui o lote.</p>
+          <div class="row" style="gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+            <label class="field" style="min-width: 100px;">
+              <span>Mês</span>
+              <select id="importMes" title="Mês da competência">
+                <option value="">—</option>
+                <option value="01">01 - Janeiro</option>
+                <option value="02">02 - Fevereiro</option>
+                <option value="03">03 - Março</option>
+                <option value="04">04 - Abril</option>
+                <option value="05">05 - Maio</option>
+                <option value="06">06 - Junho</option>
+                <option value="07">07 - Julho</option>
+                <option value="08">08 - Agosto</option>
+                <option value="09">09 - Setembro</option>
+                <option value="10">10 - Outubro</option>
+                <option value="11">11 - Novembro</option>
+                <option value="12">12 - Dezembro</option>
+              </select>
+            </label>
+            <label class="field" style="min-width: 100px;">
+              <span>Ano</span>
+              <select id="importAno" title="Ano da competência">
+                <option value="">—</option>
+              </select>
+            </label>
+            <label class="field" style="min-width: 200px;">
+              <span>Reimportar lote existente (opcional)</span>
+              <select id="importLoteExistente" title="Selecione para sobrescrever um lote já importado">
+                <option value="">Novo lote (usar mês/ano acima)</option>
+              </select>
+            </label>
+          </div>
+          <p class="muted" style="margin: 10px 0 0 0; font-size: 0.875rem;">A competência é obrigatória e será utilizada como base para agrupamento e relatórios.</p>
+        </div>
+
+        <div class="grid grid--3">
+          <div id="dropVendas" class="dropzone">
+            <input id="fileVendas" type="file" accept=".csv,text/csv" />
+            <div class="dropzone__icon">📄</div>
+            <div class="dropzone__text">Arraste o arquivo <strong>Vendas.csv</strong> aqui ou clique para selecionar
+            </div>
+            <div id="nameVendas" class="dropzone__filename"></div>
+          </div>
+
+          <div id="dropItens" class="dropzone">
+            <input id="fileItens" type="file" accept=".csv,text/csv" />
+            <div class="dropzone__icon">📦</div>
+            <div class="dropzone__text">Arraste o arquivo <strong>Itens.csv</strong> aqui ou clique para selecionar
+            </div>
+            <div id="nameItens" class="dropzone__filename"></div>
+          </div>
+
+          <div id="dropTotalseg" class="dropzone">
+            <input id="fileTotalseg" type="file"
+              accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+            <div class="dropzone__icon">📊</div>
+            <div class="dropzone__text">Arraste o arquivo <strong>Totalseg.xlsx</strong> aqui ou clique para selecionar
+            </div>
+            <div id="nameTotalseg" class="dropzone__filename"></div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="btnProcessar" class="btn btn--primary">Processar</button>
+          <button id="btnLimpar" class="btn btn--ghost">Limpar</button>
+        </div>
+      </div>
+
+      <div id="importSummary" class="card card--hidden"></div>
+
+      <div class="grid grid--3">
+        <div id="importStagingVendas" class="card card--hidden"></div>
+        <div id="importStagingItens" class="card card--hidden"></div>
+        <div id="importStagingTotalseg" class="card card--hidden"></div>
+      </div>
+
+      <div id="importCross" class="card card--hidden"></div>
+
+      <div id="importFullPreview" class="card card--hidden">
+        <div class="row row--between" style="margin-bottom:15px;">
+          <div>
+            <h2 id="previewTitle" style="margin:0; font-size:18px;">Pré-visualização dos Dados</h2>
+            <p class="muted">Confira todas as colunas e linhas antes de finalizar.</p>
+          </div>
+          <button id="btnConcluirImport" class="btn btn--primary">Concluir Importação</button>
+        </div>
+        <div id="previewTableContainer" class="tableWrap" style="max-height: 500px; overflow: auto;">
+          <!-- Tabela dinâmica aqui -->
+        </div>
+        <div class="actions" style="margin-top:15px;">
+          <button id="btnVoltarImport" class="btn btn--ghost">← Voltar / Corrigir</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="./js/store.js"></script>
+  <script src="./js/poc.js"></script>
+  <script src="./js/importacao.js"></script>
+  <script>
+    Poc.requireAuth({ allowRoles: ["Administrador", "Gestor"] });
+    Poc.renderShell({ activeRoute: "importacao" });
+    PocImportacao.init();
+  </script>
+</body>
+
+</html>

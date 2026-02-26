@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POC — Cadastro de Lojas</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="./images/favicon_io/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./images/favicon_io/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./images/favicon_io/favicon-16x16.png">
+  <link rel="shortcut icon" href="./images/favicon_io/favicon.ico">
+  <link rel="manifest" href="./images/favicon_io/site.webmanifest">
+  <meta name="theme-color" content="#512bd4">
+  <link rel="stylesheet" href="./css/styles.css" />
+
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <div id="content" style="display:none">
+    <section class="view">
+      <div id="crudRoot"></div>
+    </section>
+  </div>
+
+  <script src="./js/poc.js"></script>
+  <script src="./js/store.js"></script>
+  <script src="./js/crud-page.js"></script>
+  <script>
+    Poc.requireAuth({ allowRoles: ["Administrador", "Gestor", "Auxiliar", "Operador", "Consultor"] });
+    Poc.renderShell({ activeRoute: "cad-lojas" });
+
+    const allProds = PocStore.load("produtos");
+    const allColabs = PocStore.load("colaboradores");
+
+    // Aba Comissões oculta para Auxiliar, Operador e Consultor
+    const sess = Poc.getSession();
+    const hideComissoesTab = sess && ["Auxiliar", "Operador", "Consultor"].includes(sess.role);
+
+    // Filtra colaboradores por perfil
+    const operadores = allColabs.filter(c => {
+      const u = PocStore.load("usuarios").find(usr => usr.username === c.usuario);
+      return u && u.perfil === "Operador";
+    });
+    const consultores = allColabs.filter(c => {
+      const u = PocStore.load("usuarios").find(usr => usr.username === c.usuario);
+      return u && u.perfil === "Consultor";
+    });
+    const auxiliares = allColabs.filter(c => {
+      const u = PocStore.load("usuarios").find(usr => usr.username === c.usuario);
+      return u && u.perfil === "Auxiliar";
+    });
+
+    const baseTabs = [
+      { key: "dados", label: "Dados da Loja" },
+      { key: "socios", label: "Dados do Sócio" },
+      { key: "operadores", label: "Operadores" },
+      { key: "consultores", label: "Consultores" },
+      { key: "auxiliares", label: "Auxiliares" },
+    ];
+    const tabs = hideComissoesTab ? baseTabs : [...baseTabs, { key: "comissoes", label: "Comissões" }];
+
+    PocCrudPage.render({
+      entityKey: "lojas",
+      title: "Cadastro de Lojas",
+      tabs,
+      fields: [
+        // ABA: Dados
+        { tab: "dados", key: "razaoSocial", label: "Razão Social", required: true, placeholder: "Razão Social completa" },
+        { tab: "dados", key: "nomeFantasia", label: "Nome Fantasia", required: true, placeholder: "Nome fantasia" },
+        { tab: "dados", key: "cnpj", label: "CNPJ", required: true, placeholder: "00.000.000/0000-00" },
+        { tab: "dados", key: "email", label: "E-mail", type: "email", required: true, placeholder: "e-mail de contato" },
+        { tab: "dados", key: "telefone", label: "Telefone", required: true, placeholder: "(00) 00000-0000" },
+        { tab: "dados", key: "chavePix", label: "Chave PIX", placeholder: "CNPJ, E-mail, Celular ou Aleatória" },
+        { tab: "dados", key: "status", label: "Status", type: "select", options: ["Ativo", "Inativo"] },
+      ],
+      onAfterRenderForm: (root, editId) => {
+        const itemToEdit = editId ? PocStore.load("lojas").find(x => x.id === editId) : null;
+
+        // --- MÁSCARAS ---
+        const inputCnpj = document.getElementById("f_cnpj");
+        const inputTel = document.getElementById("f_telefone");
+
+        const maskCnpj = (v) => {
+          v = v.replace(/\D/g, "").substring(0, 14);
+          if (v.length <= 2) return v;
+          if (v.length <= 5) return v.replace(/^(\d{2})(\d)/, "$1.$2");
+          if (v.length <= 8) return v.replace(/^(\d{2})(\d{3})(\d)/, "$1.$2.$3");
+          if (v.length <= 12) return v.replace(/^(\d{2})(\d{3})(\d{3})(\d)/, "$1.$2.$3/$4");
+          return v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d)/, "$1.$2.$3/$4-$5");
+        };
+
+        const maskTel = (v) => {
+          v = v.replace(/\D/g, "").substring(0, 11);
+          if (v.length <= 2) return v;
+          if (v.length <= 6) return v.replace(/^(\d{2})(\d)/, "($1) $2");
+          if (v.length <= 10) return v.replace(/^(\d{2})(\d{4})(\d)/, "($1) $2-$3");
+          return v.replace(/^(\d{2})(\d{5})(\d)/, "($1) $2-$3");
+        };
+
+        const maskMoeda = (val) => {
+          let v = val.replace(/\D/g, '');
+          if (v === "") return "";
+          let n = parseInt(v, 10) / 100;
+          return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
+
+        if (inputCnpj) inputCnpj.oninput = (e) => e.target.value = maskCnpj(e.target.value);
+        if (inputTel) inputTel.oninput = (e) => e.target.value = maskTel(e.target.value);
+
+        // --- ABA: SÓCIOS (DINÂMICO) ---
+        const sociosHost = document.getElementById("customTabContent_socios");
+        let sociosData = itemToEdit?.socios || [];
+
+        function renderSocios() {
+          sociosHost.innerHTML = `
+            <div style="margin-top:10px;">
+              <div class="assocList" id="sociosList">
+                ${sociosData.map((s, idx) => `
+                  <div class="assocItem">
+                    <div class="assocItem__info">
+                      <strong>${Poc.escapeHtml(s.nome)}</strong>
+                      <small>${Poc.escapeHtml(s.email)} • ${Poc.escapeHtml(s.telefone)}</small>
+                    </div>
+                    <button class="btn btn--ghost" type="button" onclick="window.removeSocio(${idx})" style="color:var(--danger)">Remover</button>
+                  </div>
+                `).join("")}
+                ${sociosData.length === 0 ? '<p class="muted" style="padding:10px; text-align:center;">Nenhum sócio cadastrado.</p>' : ''}
+              </div>
+              <div class="card" style="margin-top:16px; padding:12px; background:var(--panel2); border:1px dashed var(--border);">
+                <div class="grid grid--2" style="gap:12px;">
+                  <label class="field">
+                    <span>Nome do Sócio</span>
+                    <input type="text" id="soc_nome" placeholder="Ex.: João Silva" />
+                  </label>
+                  <label class="field">
+                    <span>E-mail</span>
+                    <input type="email" id="soc_email" placeholder="joao@email.com" />
+                  </label>
+                  <label class="field">
+                    <span>Telefone</span>
+                    <input type="text" id="soc_tel" placeholder="(00) 00000-0000" />
+                  </label>
+                </div>
+                <button type="button" class="btn btn--primary" style="margin-top:16px; width:100%;" onclick="window.addSocio()">+ Adicionar Sócio à Lista</button>
+              </div>
+            </div>
+          `;
+
+          const sTel = document.getElementById("soc_tel");
+          if (sTel) sTel.oninput = (e) => e.target.value = maskTel(e.target.value);
+        }
+
+        window.addSocio = () => {
+          const nome = document.getElementById("soc_nome").value.trim();
+          const email = document.getElementById("soc_email").value.trim();
+          const tel = document.getElementById("soc_tel").value.trim();
+          if (!nome || !email || !tel) return Poc.toast("Preencha todos os dados do sócio", "bad");
+          sociosData.push({ nome, email, telefone: tel });
+          renderSocios();
+        };
+
+        window.removeSocio = (idx) => {
+          sociosData.splice(idx, 1);
+          renderSocios();
+        };
+
+        renderSocios();
+
+        // --- ABA: ASSOCIAÇÕES ---
+        const opHost = document.getElementById("customTabContent_operadores");
+        const conHost = document.getElementById("customTabContent_consultores");
+        const auxHost = document.getElementById("customTabContent_auxiliares");
+        let itemOperadores = itemToEdit?.operadores || [];
+        let itemConsultores = itemToEdit?.consultores || [];
+        let itemAuxiliares = itemToEdit?.auxiliares || [];
+
+        function renderAssoc(host, list, currentIds, type) {
+          if (!host) return;
+          host.innerHTML = `
+            <div class="assocList" style="margin-top:10px;">
+              ${list.map(c => {
+            const checked = currentIds.includes(c.id) ? 'checked' : '';
+            return `
+                  <label class="assocItem" style="cursor:pointer;">
+                    <div class="assocItem__info">
+                      <strong>${Poc.escapeHtml(c.nome)}</strong>
+                      <small>CPF: ${Poc.escapeHtml(c.cpf)}</small>
+                    </div>
+                    <input type="checkbox" data-assoc-type="${type}" data-assoc-id="${c.id}" ${checked} />
+                  </label>
+                `;
+          }).join("")}
+              ${list.length === 0 ? `<p class="muted" style="padding:10px; text-align:center;">Nenhum colaborador do tipo ${type} cadastrado.</p>` : ''}
+            </div>
+          `;
+        }
+
+        renderAssoc(opHost, operadores, itemOperadores, "Operador");
+        renderAssoc(conHost, consultores, itemConsultores, "Consultor");
+        renderAssoc(auxHost, auxiliares, itemAuxiliares, "Auxiliar");
+
+        // --- ABA: COMISSÕES (PRODUTOS) — percentual por perfil (Gestor, Auxiliar, Operador, Consultor); oculta para Auxiliar, Operador e Consultor ---
+        const finHost = document.getElementById("customTabContent_comissoes");
+        if (finHost) {
+        const finData = itemToEdit?.configFinanceira || {};
+        const PERFIS = [
+          { key: "gestor", label: "Gestor" },
+          { key: "auxiliar", label: "Auxiliar" },
+          { key: "operador", label: "Operador" },
+          { key: "consultor", label: "Consultor" },
+        ];
+
+        finHost.innerHTML = `
+          <h2 style="margin-top:24px; font-size:1rem;">Comissões por Produto — Percentual por perfil</h2>
+          <p class="muted" style="margin-top:4px;">Defina o percentual que cada perfil receberá para o produto nesta loja.</p>
+          <div class="grid" style="gap:12px; margin-top:16px;">
+            ${allProds.map(p => {
+          const raw = finData[p.id];
+          const vals = typeof raw === "object" && raw !== null
+            ? { gestor: raw.gestor ?? "", auxiliar: raw.auxiliar ?? "", operador: raw.operador ?? "", consultor: raw.consultor ?? "" }
+            : { gestor: "", auxiliar: "", operador: "", consultor: "" };
+          const valorProduto = p.valor != null && p.valor !== "" ? Number(p.valor) : 0;
+          const tipoPercentual = (p.tipoComissao || "").toLowerCase().indexOf("percentual") >= 0;
+          const valorExibicao = tipoPercentual
+            ? (valorProduto.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%")
+            : ("R$ " + valorProduto.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+          return `
+                <div class="card" style="padding:14px; margin:0; background:var(--bg); border-left:4px solid var(--primary);">
+                  <div style="margin-bottom:10px;">
+                    <strong>${Poc.escapeHtml(p.descricao || p.nome || "Produto")}</strong>
+                    <br/><small class="muted">${Poc.escapeHtml(p.codigo || p.id)}</small>
+                    <br/><span class="muted" style="font-size:12px;">Valor cadastrado no produto: <strong style="color:var(--text);">${Poc.escapeHtml(valorExibicao)}</strong></span>
+                  </div>
+                  <div class="grid grid--2" style="gap:10px;">
+                    ${PERFIS.map(perf => `
+                      <label class="field" style="margin:0;">
+                        <span style="font-size:12px;">${Poc.escapeHtml(perf.label)} (%)</span>
+                        <div style="display:flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--panel);">
+                          <input type="text"
+                                 data-prod-id="${p.id}"
+                                 data-perfil="${perf.key}"
+                                 class="prod-comm-perfil"
+                                 value="${Poc.escapeHtml(vals[perf.key])}"
+                                 style="width:70px; border:none; padding:6px; outline:none;"
+                                 placeholder="0,00" />
+                          <span style="padding:0 8px; background:var(--panel2); border-left:1px solid var(--border); display:flex; align-items:center; font-size:12px;">%</span>
+                        </div>
+                      </label>
+                    `).join("")}
+                  </div>
+                </div>
+              `;
+        }).join("")}
+          </div>
+        `;
+
+        document.querySelectorAll(".prod-comm-perfil").forEach(inp => {
+          inp.oninput = (e) => e.target.value = maskMoeda(e.target.value);
+        });
+        }
+
+        // --- EXPOR DADOS PARA O SAVE ---
+        window._getCustomLojasData = () => {
+          const ops = Array.from(document.querySelectorAll('input[data-assoc-type="Operador"]:checked')).map(i => i.getAttribute("data-assoc-id"));
+          const cons = Array.from(document.querySelectorAll('input[data-assoc-type="Consultor"]:checked')).map(i => i.getAttribute("data-assoc-id"));
+          const aux = Array.from(document.querySelectorAll('input[data-assoc-type="Auxiliar"]:checked')).map(i => i.getAttribute("data-assoc-id"));
+          const comms = {};
+          document.querySelectorAll(".prod-comm-perfil").forEach(inp => {
+            const prodId = inp.getAttribute("data-prod-id");
+            const perfil = inp.getAttribute("data-perfil");
+            if (!prodId || !perfil) return;
+            if (!comms[prodId]) comms[prodId] = { gestor: "", auxiliar: "", operador: "", consultor: "" };
+            comms[prodId][perfil] = inp.value;
+          });
+
+          return {
+            socios: sociosData,
+            operadores: ops,
+            consultores: cons,
+            auxiliares: aux,
+            configFinanceira: comms
+          };
+        };
+      },
+      onSave: (data, done) => {
+        const custom = window._getCustomLojasData();
+        const comms = custom.configFinanceira || {};
+
+        // Validação: por produto, soma dos percentuais por perfil não pode ultrapassar 100% (valor monetário) nem o percentual do produto (tipo percentual)
+        for (const p of allProds) {
+          const cfg = comms[p.id];
+          if (!cfg) continue;
+          const soma = ["gestor", "auxiliar", "operador", "consultor"].reduce((acc, k) => {
+            const v = (cfg[k] ?? "").toString().trim();
+            return acc + (Poc.parsePtBrNumber(v) || 0);
+          }, 0);
+          const tipoPercentual = (p.tipoComissao || "").toLowerCase().indexOf("percentual") >= 0;
+          const valorProduto = p.valor != null && p.valor !== "" ? Number(p.valor) : 0;
+          const limite = tipoPercentual ? valorProduto : 100;
+          if (soma > limite) {
+            const msg = tipoPercentual
+              ? `No produto "${p.descricao || p.codigo || p.id}" a soma dos percentuais por perfil (${soma.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%) não pode ultrapassar o percentual do produto (${valorProduto.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%).`
+              : `No produto "${p.descricao || p.codigo || p.id}" a soma dos percentuais por perfil (${soma.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}%) não pode ultrapassar 100%.`;
+            Poc.toast(msg, "bad");
+            return;
+          }
+        }
+
+        const finalData = { ...data, ...custom };
+        if (data.id) {
+          PocStore.update("lojas", data.id, finalData);
+        } else {
+          PocStore.add("lojas", finalData);
+        }
+        Poc.toast("Loja salva com sucesso!", "ok");
+        done();
+      }
+    });
+  </script>
+</body>
+
+</html>

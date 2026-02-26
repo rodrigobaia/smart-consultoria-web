@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POC — Login</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="./images/favicon_io/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./images/favicon_io/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./images/favicon_io/favicon-16x16.png">
+  <link rel="shortcut icon" href="./images/favicon_io/favicon.ico">
+  <link rel="manifest" href="./images/favicon_io/site.webmanifest">
+  <meta name="theme-color" content="#512bd4">
+  <link rel="stylesheet" href="./css/styles.css" />
+
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <div id="content" style="display:none">
+    <section class="view">
+      <div class="card card--narrow">
+        <h1>Entrar</h1>
+        <p class="muted">Login simulado para validar fluxo e menu por perfil.</p>
+
+        <div class="grid">
+          <label class="field">
+            <span>Usuário</span>
+            <input id="loginUser" type="text" value="admin" autocomplete="off" />
+          </label>
+
+          <label class="field">
+            <span>Senha</span>
+            <input id="loginPass" type="password" value="123" autocomplete="off" />
+          </label>
+
+          <label class="field">
+            <span>Perfil</span>
+            <select id="loginRole">
+              <option>Administrador</option>
+              <option>Gestor</option>
+              <option>Consultor</option>
+              <option>Operador</option>
+              <option>Auxiliar</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="btnLogin" class="btn btn--primary">Entrar</button>
+          <a class="btn btn--ghost" href="./recuperar-senha.html">Esqueci minha senha</a>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="./js/poc.js"></script>
+  <script>
+    // Não exige auth aqui — se já estiver logado, vai para home
+    if (Poc.getSession()) {
+      location.href = "./home.html";
+    } else {
+      // Renderiza shell sem sessão (menu escondido por role)
+      Poc.renderShell({ activeRoute: "login" });
+
+      function login() {
+        const user = (document.getElementById("loginUser").value || "").trim();
+        const pass = (document.getElementById("loginPass").value || "").trim();
+        const role = document.getElementById("loginRole").value;
+        if (!user || !pass) {
+          Poc.toast("Informe usuário e senha (simulado).", "bad");
+          return;
+        }
+        Poc.setSession({ user, role });
+        Poc.toast(`Bem-vindo, ${user} (${role}).`, "ok");
+        location.href = "./home.html";
+      }
+
+      document.getElementById("btnLogin").addEventListener("click", login);
+      document.getElementById("loginPass").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") login();
+      });
+    }
+  </script>
+</body>
+
+</html>

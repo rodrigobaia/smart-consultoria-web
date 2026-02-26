@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>POC — Credenciamento Financeiro</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="./images/favicon_io/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="./images/favicon_io/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="./images/favicon_io/favicon-16x16.png">
+    <link rel="shortcut icon" href="./images/favicon_io/favicon.ico">
+    <link rel="manifest" href="./images/favicon_io/site.webmanifest">
+    <meta name="theme-color" content="#512bd4">
+    <link rel="stylesheet" href="./css/styles.css" />
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css" />
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+</head>
+
+<body>
+    <div id="app"></div>
+
+    <div id="content" style="display:none">
+        <section class="view">
+            <div id="crudRoot"></div>
+        </section>
+    </div>
+
+    <script src="./js/poc.js"></script>
+    <script src="./js/store.js"></script>
+    <script src="./js/crud-page.js"></script>
+    <script>
+        Poc.requireAuth({ allowRoles: ["Administrador", "Gestor"] });
+        Poc.renderShell({ activeRoute: "credenciamento" });
+
+        // Gera lista de dias (1 a 31)
+        const diasVencimento = Array.from({ length: 31 }, (_, i) => String(i + 1));
+
+        PocCrudPage.render({
+            entityKey: "lojas", // Reutiliza a entidade lojas, apenas editando campos financeiros
+            title: "Credenciamento de Lojas",
+            // Listagem customizada para mostrar dados financeiros
+            columns: [
+                { key: "nomeFantasia", label: "Loja" },
+                { key: "cnpj", label: "CNPJ" },
+                {
+                    key: "mensalidade",
+                    label: "Mensalidade",
+                    render: (val) => Poc.formatMoneyBR(val)
+                },
+                {
+                    key: "percentualCockpit",
+                    label: "Cockpit %",
+                    render: (val) => val != null && val !== "" ? `${Number(val).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}%` : "—"
+                },
+                {
+                    key: "diaVencimento",
+                    label: "Vencimento",
+                    render: (val) => val ? `Dia ${val}` : "—"
+                },
+                {
+                    key: "dataReajuste",
+                    label: "Próximo Reajuste",
+                    render: (val) => val ? new Date(val).toLocaleDateString("pt-BR") : "—"
+                },
+                {
+                    key: "dataRenegociacaoCockpit",
+                    label: "Reneg. Cockpit",
+                    render: (val) => val ? new Date(val).toLocaleDateString("pt-BR") : "—"
+                },
+            ],
+            fields: [
+                { key: "nomeFantasia", label: "Loja", disabled: true }, // Apenas leitura nesta tela
+                { key: "cnpj", label: "CNPJ", disabled: true },
+                {
+                    key: "mensalidade",
+                    label: "Valor da Mensalidade",
+                    placeholder: "0,00 (pode ser zero)",
+                    prefix: "R$"
+                },
+                {
+                    key: "mensalidadeIndeterminado",
+                    label: " ",
+                    type: "checkbox-group",
+                    options: [{ value: "1", label: "Indeterminado" }],
+                    hiddenInList: true
+                },
+                {
+                    key: "percentualCockpit",
+                    label: "Percentual Cockpit (%)",
+                    placeholder: "Ex.: 2,5 (usado para cálculo de cobrança ao cliente)",
+                    suffix: "%"
+                },
+                {
+                    key: "cockpitIndeterminado",
+                    label: " ",
+                    type: "checkbox-group",
+                    options: [{ value: "1", label: "Indeterminado" }],
+                    hiddenInList: true
+                },
+                {
+                    key: "dataRenegociacaoCockpit",
+                    label: "Data para nova renegociação (Cockpit)",
+                    type: "text",
+                    placeholder: "dd/mm/aaaa",
+                    hiddenInList: true
+                },
+                {
+                    key: "diaVencimento",
+                    label: "Dia de Vencimento",
+                    type: "select",
+                    options: diasVencimento,
+                    required: true
+                },
+                {
+                    key: "dataReajuste",
+                    label: "Data da Próxima Negociação",
+                    type: "text", // Alterado para text para evitar conflito com date picker nativo
+                    required: true
+                },
+            ],
+            onAfterRenderForm: (root, editId) => {
+                const lojas = PocStore.load("lojas");
+                const isNovo = !editId;
+
+                // Novo credenciamento: exige seleção da loja (dados vêm do cadastro de loja)
+                if (isNovo) {
+                    const card = root.querySelector(".card");
+                    const blocoLoja = document.createElement("div");
+                    blocoLoja.className = "card";
+                    blocoLoja.style.marginBottom = "20px";
+                    blocoLoja.innerHTML = `
+                        <h2 style="margin:0 0 10px 0; font-size:1rem;">Selecione a Loja</h2>
+                        <p class="muted" style="margin:0 0 12px 0;">Os dados da loja (nome, CNPJ) vêm do cadastro de lojas.</p>
+                        <label class="field" style="max-width:400px;">
+                            <span>Loja <b style="color:var(--danger)">*</b></span>
+                            <select id="credenciamento_lojaId" required>
+                                <option value="">— Selecione uma loja —</option>
+                                ${lojas.map(l => `<option value="${Poc.escapeHtml(l.id)}">${Poc.escapeHtml((l.nomeFantasia || l.razaoSocial || "Loja") + " — " + (l.cnpj || ""))}</option>`).join("")}
+                            </select>
+                        </label>
+                    `;
+                    card.parentNode.insertBefore(blocoLoja, card);
+
+                    const selLoja = document.getElementById("credenciamento_lojaId");
+                    selLoja.addEventListener("change", function () {
+                        const id = this.value;
+                        const loja = lojas.find(l => l.id === id);
+                        if (!loja) return;
+                        const fNome = document.getElementById("f_nomeFantasia");
+                        const fCnpj = document.getElementById("f_cnpj");
+                        if (fNome) fNome.value = loja.nomeFantasia || loja.razaoSocial || "";
+                        if (fCnpj) fCnpj.value = loja.cnpj || "";
+                        // Preenche credenciamento existente se a loja já tiver
+                        const fMensal = document.getElementById("f_mensalidade");
+                        const fCockpit = document.getElementById("f_percentualCockpit");
+                        const fDia = document.getElementById("f_diaVencimento");
+                        const fData = document.getElementById("f_dataReajuste");
+                        if (loja.mensalidade != null && loja.mensalidade !== "" && fMensal) {
+                            const n = Number(loja.mensalidade);
+                            fMensal.value = Number.isFinite(n) ? n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "";
+                        }
+                        if (loja.percentualCockpit != null && loja.percentualCockpit !== "" && fCockpit) {
+                            const n = Number(loja.percentualCockpit);
+                            fCockpit.value = Number.isFinite(n) ? n.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : "";
+                        }
+                        if (loja.diaVencimento && fDia) fDia.value = loja.diaVencimento;
+                        if (loja.dataReajuste && fData) fData.value = loja.dataReajuste;
+                        const cbMens = document.querySelector('input[name="check_mensalidadeIndeterminado"]');
+                        const cbCockpit = document.querySelector('input[name="check_cockpitIndeterminado"]');
+                        const fDataCockpit = document.getElementById("f_dataRenegociacaoCockpit");
+                        if (loja.mensalidadeIndeterminado && cbMens) cbMens.checked = true;
+                        if (loja.cockpitIndeterminado && cbCockpit) cbCockpit.checked = true;
+                        if (loja.dataRenegociacaoCockpit && fDataCockpit) fDataCockpit.value = loja.dataRenegociacaoCockpit;
+                    });
+                }
+
+                // Carregar estado "Indeterminado" e data renegociação Cockpit ao editar
+                const lojaEdit = editId ? lojas.find(l => l.id === editId) : null;
+                if (lojaEdit) {
+                    const cbMens = document.querySelector('input[name="check_mensalidadeIndeterminado"]');
+                    const cbCockpit = document.querySelector('input[name="check_cockpitIndeterminado"]');
+                    const fDataCockpit = document.getElementById("f_dataRenegociacaoCockpit");
+                    if (lojaEdit.mensalidadeIndeterminado && cbMens) cbMens.checked = true;
+                    if (lojaEdit.cockpitIndeterminado && cbCockpit) cbCockpit.checked = true;
+                    if (lojaEdit.dataRenegociacaoCockpit && fDataCockpit) fDataCockpit.value = lojaEdit.dataRenegociacaoCockpit;
+                }
+
+                const inputMensal = document.getElementById("f_mensalidade");
+                const inputCockpit = document.getElementById("f_percentualCockpit");
+                const maskMoeda = (val) => {
+                    let v = val.replace(/\D/g, '');
+                    if (v === "") return "";
+                    let n = parseInt(v, 10) / 100;
+                    return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                };
+                const maskPercentual = (val) => {
+                    let v = val.replace(/\D/g, '');
+                    if (v === "") return "";
+                    let n = parseInt(v, 10) / 100;
+                    return n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                };
+
+                if (inputMensal) {
+                    inputMensal.oninput = (e) => e.target.value = maskMoeda(e.target.value);
+                    if (inputMensal.value) inputMensal.value = maskMoeda(inputMensal.value.replace('.', ''));
+                }
+                if (inputCockpit) {
+                    inputCockpit.oninput = (e) => e.target.value = maskPercentual(e.target.value);
+                    if (inputCockpit.value) inputCockpit.value = maskPercentual(inputCockpit.value.replace('.', ''));
+                }
+
+                // Inicializa Flatpickr
+                flatpickr("#f_dataReajuste", {
+                    locale: "pt",
+                    dateFormat: "Y-m-d",
+                    altInput: true,
+                    altFormat: "d/m/Y",
+                    allowInput: true
+                });
+                flatpickr("#f_dataRenegociacaoCockpit", {
+                    locale: "pt",
+                    dateFormat: "Y-m-d",
+                    altInput: true,
+                    altFormat: "d/m/Y",
+                    allowInput: true
+                });
+
+                // Desabilitar campo quando "Indeterminado" estiver marcado
+                const toggleIndeterminado = () => {
+                    const mensIndet = document.querySelector('input[name="check_mensalidadeIndeterminado"]')?.checked;
+                    const cockpitIndet = document.querySelector('input[name="check_cockpitIndeterminado"]')?.checked;
+                    if (inputMensal) inputMensal.disabled = !!mensIndet;
+                    if (inputCockpit) inputCockpit.disabled = !!cockpitIndet;
+                };
+                document.querySelector('input[name="check_mensalidadeIndeterminado"]')?.addEventListener("change", toggleIndeterminado);
+                document.querySelector('input[name="check_cockpitIndeterminado"]')?.addEventListener("change", toggleIndeterminado);
+                toggleIndeterminado();
+            },
+            onSave: (data, done) => {
+                // Novo credenciamento: id da loja vem do dropdown (cadastro de loja)
+                if (!data.id) {
+                    const lojaId = document.getElementById("credenciamento_lojaId")?.value?.trim();
+                    if (!lojaId) {
+                        Poc.toast("Selecione a loja para criar o credenciamento.", "bad");
+                        return;
+                    }
+                    data.id = lojaId;
+                }
+
+                // Normaliza moeda antes de salvar
+                const rawMensal = (data.mensalidade ?? "").toString().replace(/[^\d,]/g, '').replace(',', '.');
+                data.mensalidade = parseFloat(rawMensal) || 0;
+
+                // Normaliza percentual cockpit (pt-BR)
+                const rawCockpit = (data.percentualCockpit ?? "").toString().trim();
+                data.percentualCockpit = rawCockpit === "" ? null : (Poc.parsePtBrNumber(rawCockpit) ?? 0);
+
+                const mensalidadeIndeterminado = (data.mensalidadeIndeterminado || []).includes("1");
+                const cockpitIndeterminado = (data.cockpitIndeterminado || []).includes("1");
+
+                // Pelo menos um dos dois deve estar preenchido ou marcado como indeterminado
+                const temMensalidade = data.mensalidade > 0 || mensalidadeIndeterminado;
+                const temPercentual = (data.percentualCockpit != null && data.percentualCockpit > 0) || cockpitIndeterminado;
+                if (!temMensalidade && !temPercentual) {
+                    Poc.toast("Informe o valor da mensalidade ou o percentual Cockpit, ou marque Indeterminado em um deles.", "bad");
+                    return;
+                }
+
+                // Atualiza apenas os campos de credenciamento na loja (dados da loja vêm do cadastro, não sobrescrevemos nome/CNPJ)
+                const original = PocStore.load("lojas").find(x => x.id === data.id);
+                if (original) {
+                    const updated = {
+                        ...original,
+                        mensalidade: data.mensalidade,
+                        mensalidadeIndeterminado: mensalidadeIndeterminado,
+                        percentualCockpit: data.percentualCockpit,
+                        cockpitIndeterminado: cockpitIndeterminado,
+                        dataRenegociacaoCockpit: (data.dataRenegociacaoCockpit || "").trim() || null,
+                        diaVencimento: data.diaVencimento,
+                        dataReajuste: data.dataReajuste,
+                        updatedAt: new Date().toISOString()
+                    };
+                    PocStore.save("lojas", PocStore.load("lojas").map(x => x.id === data.id ? updated : x));
+                    Poc.toast(original.mensalidade != null || original.percentualCockpit != null ? "Credenciamento atualizado!" : "Credenciamento criado!", "ok");
+                } else {
+                    Poc.toast("Loja não encontrada.", "bad");
+                }
+                done();
+            },
+            addButtonLabel: "Novo Credenciamento",
+            hideAddBtn: false,
+            hideDeleteBtn: true
+        });
+    </script>
+</body>
+
+</html>

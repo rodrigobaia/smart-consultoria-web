@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POC — Cadastro de Colaboradores</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="./images/favicon_io/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./images/favicon_io/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./images/favicon_io/favicon-16x16.png">
+  <link rel="shortcut icon" href="./images/favicon_io/favicon.ico">
+  <link rel="manifest" href="./images/favicon_io/site.webmanifest">
+  <meta name="theme-color" content="#512bd4">
+  <link rel="stylesheet" href="./css/styles.css" />
+
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <div id="content" style="display:none">
+    <section class="view">
+      <div id="crudRoot"></div>
+    </section>
+  </div>
+
+  <script src="./js/poc.js"></script>
+  <script src="./js/store.js"></script>
+  <script src="./js/crud-page.js"></script>
+  <script>
+    Poc.requireAuth({ allowRoles: ["Administrador", "Gestor"] });
+    Poc.renderShell({ activeRoute: "cad-colaboradores" });
+
+    // Carrega dados para os selects
+    const userOptions = PocStore.load("usuarios").map(u => u.username);
+    const storeOptions = PocStore.load("lojas").map(l => l.nomeFantasia || l.razaoSocial);
+
+    PocCrudPage.render({
+      entityKey: "colaboradores",
+      title: "Cadastro de Colaboradores",
+      fields: [
+        { label: "Dados do Colaborador", type: "section" },
+        { key: "nome", label: "Nome", required: true, placeholder: "Nome completo" },
+        { key: "cpf", label: "CPF", required: true, placeholder: "000.000.000-00" },
+        { key: "email", label: "E-mail", type: "email", required: true, placeholder: "email@exemplo.com" },
+        { key: "telefone", label: "Telefone", placeholder: "(00)00000-0000" },
+        { key: "chavePix", label: "Chave PIX", placeholder: "CPF, E-mail, Celular ou Aleatória" },
+        {
+          key: "lojas",
+          label: "Lojas Vinculadas",
+          type: "checkbox-group",
+          options: storeOptions.length ? storeOptions : ["Nenhuma loja cadastrada"],
+          render: (item) => {
+            const vinculadas = Array.isArray(item.lojas) ? item.lojas : [];
+            if (vinculadas.length === 0) {
+              return `<span title="Sem lojas vinculadas" style="font-size: 1.2rem; cursor: default;">🚫</span>`;
+            }
+
+            // Precisamos expor uma função global ou anexar ao Poc para abrir o modal
+            window.showLojasModal = (id) => {
+              const colaboradores = PocStore.load("colaboradores");
+              const colab = colaboradores.find(c => c.id === id);
+              if (!colab || !colab.lojas) return;
+
+              const todasLojas = PocStore.load("lojas");
+              const detalhes = colab.lojas.map(nomeFantasia => {
+                const loja = todasLojas.find(l => l.nomeFantasia === nomeFantasia);
+                return `
+                  <div class="modalListItem">
+                    <strong>${Poc.escapeHtml(nomeFantasia)}</strong>
+                    <small>CNPJ: ${Poc.escapeHtml(loja ? loja.cnpj : '—')}</small>
+                  </div>
+                `;
+              }).join("");
+
+              Poc.showModal({
+                title: `Lojas de ${Poc.escapeHtml(colab.nome)}`,
+                content: `<div class="modalList">${detalhes}</div>`
+              });
+            };
+
+            return `
+              <button class="btn btn--ghost" 
+                      onclick="showLojasModal('${item.id}')" 
+                      title="Ver ${vinculadas.length} lojas vinculadas"
+                      style="padding: 4px 8px; font-size: 1.2rem;">
+                👁️
+              </button>
+            `;
+          }
+        },
+        {
+          key: "status",
+          label: "Status Colaborador",
+          type: "select",
+          options: ["Ativo", "Inativo"]
+        },
+
+        { label: "Configuração de Acesso", type: "section" },
+        {
+          label: "Os dados de acesso (usuário e senha provisória) serão enviados automaticamente para o e-mail cadastrado acima.",
+          type: "info"
+        },
+        { key: "username", label: "Login (Usuário)", required: true, placeholder: "ex.: rodrigo.baia", hiddenInList: true },
+        {
+          key: "perfil",
+          label: "Perfil de Acesso",
+          required: true,
+          type: "select",
+          options: ["Administrador", "Gestor", "Consultor", "Operador"],
+          hiddenInList: true
+        },
+        {
+          key: "status_usuario",
+          label: "Status da Conta",
+          required: true,
+          type: "select",
+          options: ["Ativo", "Inativo"],
+          hiddenInList: true
+        },
+      ],
+      onAfterRenderForm: (root, editId) => {
+        if (!editId) return;
+
+        const colaboradores = PocStore.load("colaboradores");
+        const colab = colaboradores.find(c => c.id === editId);
+        if (!colab || !colab.usuario) return;
+
+        const usuarios = PocStore.load("usuarios");
+        const user = usuarios.find(u => u.username === colab.usuario);
+
+        // Preenche campos de usuário manualmente pois vêm de outra entidade
+        const fUser = document.getElementById("f_username");
+        const fPerfil = document.getElementById("f_perfil");
+        const fStatus = document.getElementById("f_status_usuario");
+
+        if (fUser) fUser.value = colab.usuario;
+        if (user) {
+          if (fPerfil) fPerfil.value = user.perfil;
+          if (fStatus) fStatus.value = user.status;
+        }
+      },
+      onSave: (data, done) => {
+        const isEdit = !!data.id;
+
+        // 1. Tratar Usuário
+        const userData = {
+          username: data.username,
+          perfil: data.perfil,
+          status: data.status_usuario,
+        };
+
+        const allUsers = PocStore.load("usuarios");
+        const existingUser = allUsers.find(u => u.username === data.username);
+
+        if (existingUser) {
+          PocStore.update("usuarios", existingUser.id, userData);
+        } else {
+          PocStore.add("usuarios", { ...userData, twofa: "Não" });
+        }
+
+        // 2. Tratar Colaborador
+        const colabData = { ...data, usuario: data.username };
+        delete colabData.username;
+        delete colabData.perfil;
+        delete colabData.status_usuario;
+
+        if (isEdit) {
+          PocStore.update("colaboradores", data.id, colabData);
+          Poc.toast("Colaborador e Usuário atualizados!", "ok");
+        } else {
+          PocStore.add("colaboradores", colabData);
+          Poc.toast("Colaborador e Usuário criados!", "ok");
+        }
+
+        done();
+      }
+    });
+  </script>
+</body>
+
+</html>

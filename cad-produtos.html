@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POC — Cadastro de Produtos</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="./images/favicon_io/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./images/favicon_io/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./images/favicon_io/favicon-16x16.png">
+  <link rel="shortcut icon" href="./images/favicon_io/favicon.ico">
+  <link rel="manifest" href="./images/favicon_io/site.webmanifest">
+  <meta name="theme-color" content="#512bd4">
+  <link rel="stylesheet" href="./css/styles.css" />
+
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <div id="content" style="display:none">
+    <section class="view">
+      <div id="crudRoot"></div>
+    </section>
+  </div>
+
+  <script src="./js/poc.js"></script>
+  <script src="./js/store.js"></script>
+  <script src="./js/crud-page.js"></script>
+  <script>
+    Poc.requireAuth({ allowRoles: ["Administrador", "Gestor"] });
+    Poc.renderShell({ activeRoute: "cad-produtos" });
+    PocCrudPage.render({
+      entityKey: "produtos",
+      title: "Cadastro de Produtos",
+      fields: [
+        { key: "codigo", label: "Código", required: true, placeholder: "Ex.: SPF VIDA 372-BS" },
+        { key: "descricao", label: "Descrição", required: true, placeholder: "Descrição do produto" },
+        {
+          key: "tipoComissao",
+          label: "Tipo Comissão",
+          required: true,
+          type: "select",
+          options: ["Percentual", "Valor Fixo"]
+        },
+        {
+          key: "valor",
+          label: "Valor",
+          type: "text",
+          placeholder: "Ex.: 150,00",
+          render: (item) => {
+            const val = item.valor ?? "0";
+            if (item.tipoComissao === "Percentual") {
+              return `${Poc.escapeHtml(String(val).replace('.', ','))}%`;
+            }
+            const num = parseFloat(val) || 0;
+            return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          }
+        },
+        {
+          key: "status",
+          label: "Status",
+          type: "select",
+          options: ["Ativo", "Inativo"]
+        },
+      ],
+      onSave: (data, done) => {
+        // Normaliza o valor: remove R$, remove pontos de milhar, troca vírgula por ponto
+        let raw = (data.valor || "0").toString();
+        raw = raw.replace(/[^\d,]/g, '').replace(',', '.');
+        data.valor = parseFloat(raw) || 0;
+
+        if (data.id) {
+          PocStore.update("produtos", data.id, data);
+        } else {
+          PocStore.add("produtos", data);
+        }
+        Poc.toast("Produto salvo com sucesso!", "ok");
+        done();
+      },
+      onAfterRenderForm: (root) => {
+        const selTipo = document.getElementById("f_tipoComissao");
+        const inputValor = document.getElementById("f_valor");
+        const labelText = document.querySelector('label[for="f_valor"] .field__label');
+        const container = inputValor.parentElement;
+
+        function formatValue(val, isPercent) {
+          let v = val.replace(/\D/g, '');
+          if (v === "") return "";
+
+          if (isPercent) {
+            // Percentual: máximo 100,00
+            let n = parseInt(v, 10) / 100;
+            if (n > 100) n = 100;
+            return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          } else {
+            // Moeda
+            let n = parseInt(v, 10) / 100;
+            return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          }
+        }
+
+        function updateUI() {
+          const isPercent = selTipo.value === "Percentual";
+          if (labelText) labelText.innerText = isPercent ? "Percentual *" : "Valor *";
+
+          if (isPercent) {
+            inputValor.placeholder = "0,00";
+            if (container.querySelector(".field__prefix")) container.querySelector(".field__prefix").style.display = "none";
+            let suffix = container.querySelector(".field__suffix");
+            if (!suffix) {
+              suffix = document.createElement("span");
+              suffix.className = "field__suffix";
+              suffix.style = "padding: 0 10px; background: var(--panel2); border-left: 1px solid var(--border); display: flex; align-items: center; font-size: 14px; color: var(--text-muted);";
+              container.appendChild(suffix);
+            }
+            suffix.innerText = "%";
+            suffix.style.display = "flex";
+          } else {
+            inputValor.placeholder = "0,00";
+            if (container.querySelector(".field__suffix")) container.querySelector(".field__suffix").style.display = "none";
+            let prefix = container.querySelector(".field__prefix");
+            if (!prefix) {
+              prefix = document.createElement("span");
+              prefix.className = "field__prefix";
+              prefix.style = "padding: 0 10px; background: var(--panel2); border-right: 1px solid var(--border); display: flex; align-items: center; font-size: 14px; color: var(--text-muted);";
+              container.insertBefore(prefix, inputValor);
+            }
+            prefix.innerText = "R$";
+            prefix.style.display = "flex";
+          }
+        }
+
+        inputValor.oninput = (e) => {
+          const isPercent = selTipo.value === "Percentual";
+          e.target.value = formatValue(e.target.value, isPercent);
+        };
+
+        selTipo.onchange = () => {
+          updateUI();
+          inputValor.value = ""; // Limpa ao trocar tipo para evitar confusão
+        };
+
+        updateUI();
+        // Se estiver editando, formata o valor inicial
+        if (inputValor.value) {
+          const initialNum = parseFloat(inputValor.value) || 0;
+          const initialRaw = initialNum.toFixed(2).replace(/\D/g, '');
+          inputValor.value = formatValue(initialRaw, selTipo.value === "Percentual");
+        }
+      }
+    });
+  </script>
+</body>
+
+</html>

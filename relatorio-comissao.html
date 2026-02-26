@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>POC — Relatório de Comissões</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="./images/favicon_io/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="./images/favicon_io/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="./images/favicon_io/favicon-16x16.png">
+    <link rel="shortcut icon" href="./images/favicon_io/favicon.ico">
+    <link rel="manifest" href="./images/favicon_io/site.webmanifest">
+    <meta name="theme-color" content="#512bd4">
+    <link rel="stylesheet" href="./css/styles.css" />
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css" />
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
+    <style>
+        .multi-select-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .multi-select-box {
+            border: 1px solid var(--border);
+            background: var(--panel2);
+            border-radius: var(--radius2);
+            max-height: 120px;
+            overflow-y: auto;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .multi-select-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .multi-select-item:hover {
+            background: rgba(79, 140, 255, 0.1);
+        }
+
+        .multi-select-item input {
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app"></div>
+
+    <div id="content" style="display:none">
+        <section class="view">
+            <div class="card">
+                <h1>Relatório de Comissões</h1>
+                <p class="muted">Filtre e exporte os dados de comissão por período, loja e colaborador.</p>
+
+                <div class="grid grid--2" style="margin-top: 20px; gap: 20px;">
+                    <!-- Filtros de Período -->
+                    <div class="field">
+                        <span class="field__label">Data Início</span>
+                        <input type="date" id="filterDataInicio" />
+                    </div>
+                    <div class="field">
+                        <span class="field__label">Data Fim</span>
+                        <input type="date" id="filterDataFim" />
+                    </div>
+
+                    <!-- Filtros de Loja (Admin/Gestor) -->
+                    <div id="filterLojaContainer" class="field" style="display:none;">
+                        <span class="field__label">Lojas</span>
+                        <div class="multi-select-container">
+                            <div id="listLojas" class="multi-select-box">
+                                <!-- Dinâmico -->
+                            </div>
+                            <small class="muted">Selecione uma ou mais lojas</small>
+                        </div>
+                    </div>
+
+                    <!-- Filtros de Colaborador (Admin/Gestor) -->
+                    <div id="filterColaboradorContainer" class="field" style="display:none;">
+                        <span class="field__label">Colaboradores</span>
+                        <div class="multi-select-container">
+                            <div id="listColaboradores" class="multi-select-box">
+                                <!-- Dinâmico -->
+                            </div>
+                            <small class="muted">Selecione um ou mais colaboradores</small>
+                        </div>
+                    </div>
+
+                    <!-- Info Colaborador (Consultor/Operador) -->
+                    <div id="filterInfoUser" class="field" style="display:none;">
+                        <span class="field__label">Colaborador</span>
+                        <input type="text" id="txtUserLocked" disabled />
+                    </div>
+                </div>
+
+                <div class="actions" style="margin-top: 24px;">
+                    <button id="btnFiltrar" class="btn btn--primary">Filtrar Relatório</button>
+                    <button id="btnLimparFiltros" class="btn btn--ghost">Limpar</button>
+                    <div style="flex:1"></div>
+                    <button id="btnExportPdf" class="btn btn--ghost">📄 Exportar PDF</button>
+                    <button id="btnExportExcel" class="btn btn--ghost">📗 Exportar Excel</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="tableWrap">
+                    <table id="tableRelatorio">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Colaborador</th>
+                                <th>Loja</th>
+                                <th>CNPJ</th>
+                                <th>Nº Proposta</th>
+                                <th>Vlr Financiado</th>
+                                <th>Vlr Comissão</th>
+                                <th>Produto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyRelatorio">
+                            <tr>
+                                <td colspan="8" class="muted" style="text-align:center; padding: 40px;">Utilize os
+                                    filtros acima para gerar o relatório.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="reportSummary" class="row row--between" style="margin-top: 15px; display:none;">
+                    <div class="muted" style="font-size: 13px;">
+                        Total de registros: <strong id="countRegistros">0</strong>
+                    </div>
+                    <div class="muted" style="font-size: 13px;">
+                        Total Comissão: <strong id="sumComissoes">R$ 0,00</strong>
+                    </div>
+                </div>
+
+                <!-- Pagination para o relatório -->
+                <div id="paginationContainer" class="pagination" style="display:none;">
+                    <button class="pagination__btn" id="btnPrevPage">← Anterior</button>
+                    <div class="pagination__info">Página <strong id="currentPage">1</strong> de <strong
+                            id="totalPages">1</strong></div>
+                    <button class="pagination__btn" id="btnNextPage">Próxima →</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="./js/store.js"></script>
+    <script src="./js/poc.js"></script>
+    <script src="./js/relatorio-comissao.js"></script>
+    <script>
+        Poc.requireAuth();
+        Poc.renderShell({ activeRoute: "relatorio-comissao" });
+        PocRelatorioComissao.init();
+    </script>
+</body>
+
+</html>

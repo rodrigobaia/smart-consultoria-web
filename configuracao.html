@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POC — Configuração</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="./images/favicon_io/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./images/favicon_io/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./images/favicon_io/favicon-16x16.png">
+  <link rel="shortcut icon" href="./images/favicon_io/favicon.ico">
+  <link rel="manifest" href="./images/favicon_io/site.webmanifest">
+  <meta name="theme-color" content="#512bd4">
+  <link rel="stylesheet" href="./css/styles.css" />
+
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <div id="content" style="display:none">
+    <section class="view">
+      <div class="card">
+        <h1>Configuração</h1>
+        <p class="muted">
+          Placeholder (POC). Aqui entra a configuração da matriz de comissão, perfis, parâmetros de importação, etc.
+        </p>
+        <ul class="bullets">
+          <li>Matriz de Comissão (Produto × Perfil) + histórico</li>
+          <li>Parâmetros de importação (encoding padrão, idempotência, etc.)</li>
+          <li>Regras por Banco/Instituição Financeira (ex.: incentivo)</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script src="./js/poc.js"></script>
+  <script>
+    Poc.requireAuth({ allowRoles: ["Administrador", "Gestor"] });
+    Poc.renderShell({ activeRoute: "configuracao" });
+  </script>
+</body>
+
+</html>

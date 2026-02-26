@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>POC — Alterar Senha</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="./images/favicon_io/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="./images/favicon_io/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="./images/favicon_io/favicon-16x16.png">
+    <link rel="shortcut icon" href="./images/favicon_io/favicon.ico">
+    <link rel="manifest" href="./images/favicon_io/site.webmanifest">
+    <meta name="theme-color" content="#512bd4">
+    <link rel="stylesheet" href="./css/styles.css" />
+
+</head>
+
+<body>
+    <div id="app"></div>
+
+    <div id="content" style="display:none">
+        <section class="view">
+            <div class="card card--narrow">
+                <header style="margin-bottom: 24px;">
+                    <h1>Alterar Senha</h1>
+                    <p class="muted">Para sua segurança, informe sua senha atual e escolha uma nova.</p>
+                </header>
+
+                <div class="grid">
+                    <label class="field">
+                        <span>Senha Atual</span>
+                        <input type="password" id="currentPass" placeholder="••••••••" />
+                    </label>
+                    <label class="field">
+                        <span>Nova Senha</span>
+                        <input type="password" id="newPass" placeholder="••••••••" />
+                    </label>
+                    <label class="field">
+                        <span>Confirmar Nova Senha</span>
+                        <input type="password" id="confirmPass" placeholder="••••••••" />
+                    </label>
+                </div>
+
+                <div class="actions" style="margin-top: 24px;">
+                    <button class="btn btn--primary" onclick="window.saveNewPassword()">Salvar Nova Senha</button>
+                    <a href="./home.html" class="btn btn--ghost">Cancelar</a>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="./js/poc.js"></script>
+    <script>
+        Poc.requireAuth();
+        Poc.renderShell({ activeRoute: "perfil" });
+
+        window.saveNewPassword = function () {
+            const current = document.getElementById("currentPass").value;
+            const pass = document.getElementById("newPass").value;
+            const confirm = document.getElementById("confirmPass").value;
+
+            if (!current || !pass || !confirm) {
+                Poc.toast("Preencha todos os campos.", "bad");
+                return;
+            }
+            if (pass !== confirm) {
+                Poc.toast("As senhas não conferem.", "bad");
+                return;
+            }
+
+            Poc.toast("Senha alterada com sucesso (simulado).", "ok");
+            setTimeout(() => location.href = "./home.html", 1500);
+        };
+    </script>
+</body>
+
+</html>

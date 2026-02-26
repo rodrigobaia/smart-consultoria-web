@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POC — Cadastro de Bancos / IF</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="./images/favicon_io/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./images/favicon_io/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./images/favicon_io/favicon-16x16.png">
+  <link rel="shortcut icon" href="./images/favicon_io/favicon.ico">
+  <link rel="manifest" href="./images/favicon_io/site.webmanifest">
+  <meta name="theme-color" content="#512bd4">
+  <link rel="stylesheet" href="./css/styles.css" />
+
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <div id="content" style="display:none">
+    <section class="view">
+      <div id="crudRoot"></div>
+    </section>
+  </div>
+
+  <script src="./js/poc.js"></script>
+  <script src="./js/store.js"></script>
+  <script src="./js/crud-page.js"></script>
+  <script>
+    Poc.requireAuth({ allowRoles: ["Administrador", "Gestor"] });
+    Poc.renderShell({ activeRoute: "cad-bancos" });
+    PocCrudPage.render({
+      entityKey: "bancos",
+      title: "Cadastro de Bancos",
+      fields: [
+        { key: "nome", label: "Nome", required: true, placeholder: "Ex.: BANCO BBC S.A" },
+        { key: "codigoExterno", label: "Código Externo", placeholder: "Ex.: BBC / DAYCOVAL / etc." },
+        {
+          key: "status",
+          label: "Status",
+          type: "select",
+          options: ["Ativo", "Inativo"]
+        },
+        { key: "observacao", label: "Observação", placeholder: "Opcional" },
+      ],
+    });
+  </script>
+</body>
+
+</html>

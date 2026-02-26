@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POC — Home</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="./images/favicon_io/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="./images/favicon_io/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./images/favicon_io/favicon-16x16.png">
+  <link rel="shortcut icon" href="./images/favicon_io/favicon.ico">
+  <link rel="manifest" href="./images/favicon_io/site.webmanifest">
+  <meta name="theme-color" content="#512bd4">
+  <link rel="stylesheet" href="./css/styles.css" />
+
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <div id="content" style="display:none">
+    <section class="view">
+      <div class="row row--between" style="margin-bottom: 20px;">
+        <h1>Dashboard</h1>
+        <div class="muted" id="lastUpdate"></div>
+      </div>
+
+      <div class="kpi">
+        <div class="kpiCard">
+          <div class="kpiCard__label">Lojas Ativas</div>
+          <div class="kpiCard__value" id="countLojasAtivas">0</div>
+        </div>
+        <div class="kpiCard">
+          <div class="kpiCard__label">Lojas Inativas</div>
+          <div class="kpiCard__value" id="countLojasInativas">0</div>
+        </div>
+        <div class="kpiCard">
+          <div class="kpiCard__label">Consultor</div>
+          <div class="kpiCard__value" id="countConsultores">0</div>
+        </div>
+        <div class="kpiCard">
+          <div class="kpiCard__label">Operadores</div>
+          <div class="kpiCard__value" id="countOperadores">0</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 24px;">
+        <div class="row row--between">
+          <div class="pill">
+            <span class="pill__label">Status do Sistema:</span>
+            <span class="badge badge--ok">Online</span>
+          </div>
+          <div class="pill">
+            <span class="pill__label">Usuários Logados (POC):</span>
+            <strong id="countLogados">1</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="./js/poc.js"></script>
+  <script src="./js/store.js"></script>
+  <script>
+    Poc.requireAuth();
+    Poc.renderShell({ activeRoute: "home" });
+
+    // Lógica do Dashboard
+    function updateDashboard() {
+      const lojas = PocStore.load("lojas");
+      const usuarios = PocStore.load("usuarios");
+
+      const ativas = lojas.filter(l => l.status === "Ativo").length;
+      const inativas = lojas.filter(l => l.status === "Inativo").length;
+      const consultores = usuarios.filter(u => u.perfil === "Consultor").length;
+      const operadores = usuarios.filter(u => u.perfil === "Operador").length;
+
+      document.getElementById("countLojasAtivas").textContent = ativas;
+      document.getElementById("countLojasInativas").textContent = inativas;
+      document.getElementById("countConsultores").textContent = consultores;
+      document.getElementById("countOperadores").textContent = operadores;
+
+      // Simulação de usuários logados (entre 1 e 5 para a POC)
+      const logados = Math.floor(Math.random() * 5) + 1;
+      document.getElementById("countLogados").textContent = logados;
+
+      document.getElementById("lastUpdate").textContent = "Atualizado em: " + new Date().toLocaleTimeString();
+    }
+
+    updateDashboard();
+  </script>
+</body>
+
+</html>

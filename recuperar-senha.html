@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>POC — Recuperar Senha</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="./images/favicon_io/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="./images/favicon_io/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="./images/favicon_io/favicon-16x16.png">
+    <link rel="shortcut icon" href="./images/favicon_io/favicon.ico">
+    <link rel="manifest" href="./images/favicon_io/site.webmanifest">
+    <meta name="theme-color" content="#512bd4">
+    <link rel="stylesheet" href="./css/styles.css" />
+
+</head>
+
+<body class="bg-grad">
+    <div class="app app--center">
+        <div class="card card--narrow">
+            <div style="text-align: center; margin-bottom: 24px;">
+                <h1 style="font-size: 28px;">Recuperar Senha</h1>
+                <p class="muted">Informe seu e-mail cadastrado para receber instruções de recuperação.</p>
+            </div>
+
+            <div class="grid">
+                <label class="field">
+                    <span>E-mail</span>
+                    <input type="email" id="recoveryEmail" placeholder="seu-email@exemplo.com" />
+                </label>
+            </div>
+
+            <div class="actions" style="margin-top: 24px;">
+                <button class="btn btn--primary" style="width: 100%;" onclick="window.sendRecovery()">Enviar Link de
+                    Recuperação</button>
+                <a href="./login.html" class="btn btn--ghost" style="width: 100%;">Voltar ao Login</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="./js/poc.js"></script>
+    <script>
+        window.sendRecovery = function () {
+            const email = document.getElementById("recoveryEmail").value;
+            if (!email || !email.includes("@")) {
+                Poc.toast("Informe um e-mail válido.", "bad");
+                return;
+            }
+            Poc.toast(`Link enviado para ${email} (simulado). Verifique sua caixa de entrada.`, "ok");
+            setTimeout(() => location.href = "./login.html", 3000);
+        };
+    </script>
+
+    <style>
+        .bg-grad {
+            background: radial-gradient(circle at 50% 50%, var(--panel) 0%, var(--bg) 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .app--center {
+            width: 100%;
+            max-width: 440px;
+            padding: 20px;
+        }
+    </style>
+</body>
+
+</html>
